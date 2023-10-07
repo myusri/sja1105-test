@@ -33,40 +33,53 @@ Some points to note:
 
 ## Configuration
 
-After reset, the switch expects a stream of data to the Static Configuration
-Interface (via SPI), to set the port modes, VLANs, and other forwarding and QOS
-rules.
+After startup, the switch expects a stream of data to the Static Configuration
+Interface (via SPI), starting from address 20000h, the configuration area.
 
 Once configured statically, subsequent configuration can be done through the
-Programming Interface.
+Dynamic Control Interface (also via SPI).
 
-32b core device ids:
+The configuration area is write-only via the Static Configuration Interface.
+Some parts can be read later via the Dynamic Control Interface.
 
-| Device     | Switch core device id | Part No |
+The static configuration data can be downloaded in one go in a single SPI
+transaction, or it can be split into multiple transactions, based on the
+generic loader format below. 
+
+Configuration need to be restarted if the previous configuration is failed.
+In this case the CONFIGS flag stays de-asserted. Once successfully configured,
+the CONFIGS flag will be asserted. The CONFIGS flags is in the Initial device
+configuration flag register.
+
+32b core device IDs:
+
+| Device     | Switch core device ID | Part No |
 |------------|-----------------------|---------|
 | SJA1105PEL | AF00030Eh             | 9A84h   |
 | SJA1105QEL | AE00030Eh             | 9A85h   |
 | SJA1105REL | AF00030Eh             | 9A86h   |
 | SJA1105SEL | AE00030Eh             | 9A87h   |
 
-### Generic loader format
+Generic loader format:
 
-    |-----------------------------------------|
+    |=========================================|
     | Device ID (32b)                         |
-    |-----------------------------------------|
+    |=========================================|
     | BlockID (8b) | Unused (24b)             |
     | Unused (8b)  | BlockLength (24b)        |
     | CRC (32b)                               |
+    |-----------------------------------------|
     | Data 1 (32b)                            |
     | ...                                     |
     | Data N (32b)                            |
-    |-----------------------------------------|
+    | CRC (32b)                               |
+    |=========================================|
     | 0, 1, or more blocks                    |
-    |-----------------------------------------|
+    |=========================================|
     | Unused (32b)                            |
     | Unused (8b)  | 0 (24b)                  |
     | Global CRC (32b)                        |
-    |-----------------------------------------|
+    |=========================================|
 
 * Device ID (32b) followed by sequence of configuration blocks.
 * Each block starts with 8b BlockID followed by BlockLength. The block header
@@ -75,6 +88,11 @@ Programming Interface.
   protected also.
 * CRC is the CRC-32 Ethernet calculate from the lowest byte to the highest byte 
   in each word.
+
+Each block is a stream of 32b words that defines one or more entries. Each 
+entry can take multiple of words arranged from the least significant word
+address to the most significant word address. The bit fields for the entries
+depends on the type of the table.
 
 ## Other References
 

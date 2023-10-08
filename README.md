@@ -2,7 +2,7 @@
 
 SPI is used for the static configuration of the Ethernet switch. For this
 project we will use Microchip MCP2210 USB-to-SPI bridge to ease interfacing to
-switch.
+switch. We will also not focus on the Time-Triggered Ethernet feature. 
 
 Some points to note:
 
@@ -31,7 +31,7 @@ Some points to note:
   now).
 * Unused ports should be disabled in software (SPI).
 
-## Configuration
+## Static Configuration
 
 After startup, the switch expects a stream of data to the Static Configuration
 Interface (via SPI), starting from address 20000h, the configuration area.
@@ -46,8 +46,8 @@ The static configuration data can be downloaded in one go in a single SPI
 transaction, or it can be split into multiple transactions, based on the
 generic loader format below. 
 
-Configuration need to be restarted if the previous configuration is failed.
-In this case the CONFIGS flag stays de-asserted. Once successfully configured,
+Configuration need to be restarted if the previous configuration failed. In 
+this case the CONFIGS flag stays de-asserted. Once successfully configured,
 the CONFIGS flag will be asserted. The CONFIGS flags is in the Initial device
 configuration flag register.
 
@@ -92,7 +92,52 @@ Generic loader format:
 Each block is a stream of 32b words that defines one or more entries. Each 
 entry can take multiple of words arranged from the least significant word
 address to the most significant word address. The bit fields for the entries
-depends on the type of the table.
+depend on the type of the table.
+
+The minimum required configuration tables for static configuration:
+
+| Block ID | Table                         | Note               |
+|----------|-------------------------------|--------------------|
+| 06h      | L2 Policing Table             | At least one entry |
+| 08h      | L2 Forwarding Table           |
+| 09h      | MAC Configuration Table       |
+| OEh      | L2 Forwarding Parameter Table |
+| 11h      | General Parameters Table      |
+| 4Eh      | xMII Mode Parameter Table     |
+
+### L2 Policing Table
+
+* It defines policing rules and priority for each port.
+* At least entry 0 needs to be loaded. Ethernet frames with no policy entry will
+  default to entry 0.
+* All frames will be dropped if entry 0 is not loaded.
+* Initially, bandwidth credit for an entry is set to SMAX. For every valid 
+  Ethernet frame, bandwidth credit is decreased by the number of bytes in the
+  frame.
+* At the same time, for every 8μs, bandwidth credit is incremented by (RATE/64)
+  bytes. RATE is set to the desired data rate (bps) divided by 15625, e.g., for
+  1Gbps, RATE is 64000.
+  
+L2 Policing Table entry:
+
+| Bit   | Size | Field     | Note                                                   |
+|-------|------|-----------|--------------------------------------------------------|
+| 63:58 | 6b   | SHARINDX  | Point to shared policing entry                         |
+| 57:42 | 16b  | SMAX      | Max burst size (bytes) for received frames             |
+| 41:26 | 16b  | RATE      | Admitted bandwidth (multiple of 15.625 kbps)           |
+| 25:15 | 11b  | MAXLEN    | Max frame length (bytes) including overhead. Max 2043. |
+| 14:12 | 3b   | PARTITION | L2 memory partition to take the Ethernet frame from    |
+
+## Dynamic Configuration
+
+These configuration tables can only be configured dynamically during runtime.
+
+| Table                              | Note                               |
+|------------------------------------|------------------------------------|
+| L2 Address Lookup Table            | For dynamically learned L2 entries |
+| Management L2 Address Lookup table | For management frames sent by host |
+
+
 
 ## Other References
 

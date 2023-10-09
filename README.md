@@ -31,6 +31,20 @@ Some points to note:
   now).
 * Unused ports should be disabled in software (SPI).
 
+The switch has these stages when processing frames coming in from its ports:
+* Ingress
+* Forwarding
+* Egress
+
+Combined throughput may not exceed 1Gbps. There are three ways to manage the
+flow:
+* Do nothing ("standard" configuration)
+* Ingress policing
+* Time gating (flow scheduling)
+
+Internal default VLAN tagging is used to help in rate limiting schemes of 
+ingress policing and time  gating.
+
 ## Static Configuration
 
 After startup, the switch expects a stream of data to the Static Configuration
@@ -107,6 +121,8 @@ The minimum required configuration tables for static configuration:
 
 ### L2 Policing Table
 
+Block 06h
+
 * It defines policing rules and priority for each port.
 * At least entry 0 needs to be loaded. Ethernet frames with no policy entry will
   default to entry 0.
@@ -128,6 +144,60 @@ L2 Policing Table entry:
 | 25:15 | 11b  | MAXLEN    | Max frame length (bytes) including overhead. Max 2043. |
 | 14:12 | 3b   | PARTITION | L2 memory partition to take the Ethernet frame from    |
 
+For the "standard" do-nothing configuration we may only define entry 0 and set
+its fields to:
+
+| Field     | Value | Note                                         |
+|-----------|-------|----------------------------------------------|
+| SHARINDX  | 0h    | Point to itself                              |
+| SMAX      | FFFFh | Set to max. Let RATE manages the flow        |
+| RATE      | FA00h | 64000 for 1Gbps                              |
+| MAXLEN    | 7FBh  | 2043 bytes, the maximum frame size supported |
+| PARTITION | 0h    | L2 memory partition 0                        |
+
+### MAC Configuration Table
+
+Block 09h
+
+The table is used to configure each of the 5 ports. EGRESS and INGRESS must be
+disabled if the MAC configuration for the corresponding port is not used.
+
+MAC configuration table fields (one table entry per port):
+
+| Bit     | Size | Field      | Note                                                              |
+|---------|------|------------|-------------------------------------------------------------------|
+| 255:247 | 9b   | TOP[7]     | Max frames of priority 7 that can...                              |
+| 246:238 | 9b   | BASE[7]    | wait in the output queue of the port...                           |
+| 237     | 1b   | ENABLED[7] | if enabled.                                                       |
+| ...     | ...  | ...        |
+| 255:247 | 9b   | TOP[0]     | Max frames of priority 0 that can...                              |
+| 246:238 | 9b   | BASE[0]    | wait in the output queue of the port...                           |
+| 237     | 1b   | ENABLED[0] | if enabled.                                                       |
+| 103:99  | 5b   | IFG        | 12-byte Ethernet IFG                                              |
+| 98:97   | 2b   | SPEED      | 11 - 10Mbps, 10 - 100 Mbps, 01 - 1Gbps, 00 - dynamic by host      |
+| 96:81   | 16b  | TP_DELIN   | IEEE 1588v2 one-step event messages/TT-related field              |
+| 80:65   | 16b  | TP_DELOUT  | IEEE 1588v2 one-step event messages/TT-related field              |
+| 64:57   | 8b   | MAXAGE     | Set to 0 for P or Q part                                          |
+| 56:54   | 3b   | VLANPRIO   | Untagged frame IEEE802.1Q priority                                |
+| 53:42   | 12b  | VLANID     | Untagged frame VLAN ID (0-4095)                                   |
+| 41      | 1b   | ING_MIRR   | Mirror received traffic to MIRR_PORT in General Parameters Table  |
+| 40      | 1b   | EGR_MIRR   | Mirror forwarded traffic to MIRR_PORT in General Parameters Table |
+| 39      | 1b   | DRPNONA664 | Set to 0 for P or Q part                                          |
+| 38      | 1b   | DRPDTAG    | Drop double tagged frames                                         |
+| 37      | 1b   | DRPSOTAG   | Drop Single outer tag (S-tag) frames                              |
+| 36      | 1b   | DRPSITAG   | Drop Single inner tag (C-tag) frames                              |
+| 35      | 1b   | DRPUNTAG   | Drop untagged frames                                              |
+| 34      | 1b   | RETAG      | Retag tagged frames using VLANID                                  |
+| 33      | 1b   | DYN_LEARN  | Enable dynamic address learning                                   |
+| 32      | 1b   | EGRESS     | Enable port output                                                |
+| 31      | 1b   | INGRESS    | Enable port input                                                 |
+| 30      | 1b   | MIRRCIE    | Handle mirroring conflict                                         |
+| 29      | 1b   | MIRRCETAG  | Handle mirroring conflict                                         |
+| 28:17   | 12b  | INGMIRRVID | Outer VLAN tag for ingress mirrored frame (if non-zero)           |
+| 16:14   | 3b   | INGMIRRPCP | PCP of ingress mirrored frames                                    |
+| 13      | 1b   | INGMIRRDEI | PCP of ingress mirrored frames                                    |
+| 12:0    | 13b  | not used   |
+
 ## Dynamic Configuration
 
 These configuration tables can only be configured dynamically during runtime.
@@ -137,11 +207,13 @@ These configuration tables can only be configured dynamically during runtime.
 | L2 Address Lookup Table            | For dynamically learned L2 entries |
 | Management L2 Address Lookup table | For management frames sent by host |
 
-
-
 ## Other References
 
-* [SJA1105 Tools](https://github.com/nxp-archive/openil_sja1105-tool)
+* [SJA1105 Tool](https://github.com/nxp-archive/openil_sja1105-tool)
+* [SJA1105-Tool User Guide](https://community.nxp.com/pwmxy87654/attachments/pwmxy87654/other/8508/1/SJA1105-Tool%20User%20Guide.pdf)
+  (PDF)
+* [SJA1105Q-EVB Eval Board](https://www.nxp.com/design/development-boards/ethernet-switch-and-phy-evaluation-board:SJA1105Q-EVB)
+  \- Python scripts to generate specific static configuration streams (login required)
 
 
   

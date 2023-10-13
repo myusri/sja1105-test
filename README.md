@@ -212,6 +212,7 @@ These configuration tables can only be configured dynamically during runtime.
 * [SJA1105 Tool](https://github.com/nxp-archive/openil_sja1105-tool)
 * [SJA1105-Tool User Guide](https://community.nxp.com/pwmxy87654/attachments/pwmxy87654/other/8508/1/SJA1105-Tool%20User%20Guide.pdf)
   (PDF)
+* [The Linux Kernel - NXP SJA1105 switch driver](https://docs.kernel.org/networking/dsa/sja1105.html)
 * [SJA1105Q-EVB Eval Board](https://www.nxp.com/design/development-boards/ethernet-switch-and-phy-evaluation-board:SJA1105Q-EVB)
   \- Python scripts to generate specific static configuration streams (login required)
 
